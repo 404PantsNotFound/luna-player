@@ -1,0 +1,46 @@
+name: luna_music
+description: Luna - YouTube Music Player
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: ">=3.6.0 <4.0.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  provider: ^6.1.2
+  http: ^1.2.2
+  dio: ^5.7.0
+  cached_network_image: ^3.4.0
+
+  just_audio: ^0.9.40
+  just_audio_background: ^0.0.1-beta.17
+  audio_session: ^0.1.25
+
+  path_provider: ^2.1.5
+  path: ^1.9.0
+  sqflite: ^2.3.3
+  shared_preferences: ^2.3.2
+
+  youtube_explode_dart: ^3.0.5
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+  flutter_launcher_icons: ^0.14.1
+
+flutter_launcher_icons:
+  android: true
+  ios: false
+  image_path: "assets/icon/icon.png"
+  min_sdk_android: 21
+  adaptive_icon_background: "#2D1B69"
+  adaptive_icon_foreground: "assets/icon/icon.png"
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/icon/
