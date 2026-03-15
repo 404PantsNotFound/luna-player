@@ -38,15 +38,14 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    // ✅ When app is fully closed (detached), stop if toggle is off
-    if (state == AppLifecycleState.detached) {
+    if (state == AppLifecycleState.paused) {
       final settings = context.read<SettingsService>();
       final player = context.read<PlayerService>();
-
-      if (!settings.playWhenClosed) {
+      if (!settings.backgroundPlayback) {
         player.stop();
       }
     }
+    // onTaskRemoved in audio handler handles "keep playing when closed"
   }
 
   @override

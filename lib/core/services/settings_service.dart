@@ -68,7 +68,7 @@ class SettingsService extends ChangeNotifier {
   Future<void> setPlayWhenClosed(bool value) async {
     _playWhenClosed = value;
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool('play_when_closed', value);
+    await prefs.setBool('play_when_closed', value); // ✅ flutter. prefix added automatically
     notifyListeners();
   }
 }

@@ -1,15 +1,16 @@
 import 'dart:async';
 
+import 'package:audio_service/audio_service.dart';
 import 'package:flutter/foundation.dart';
 import 'package:just_audio/just_audio.dart';
-import 'package:just_audio_background/just_audio_background.dart';
 import 'package:sqflite/sqflite.dart';
 
 import '../../../core/database/database_helper.dart';
 import '../../../core/models/track_item.dart';
+import '../../../core/services/audio_handler.dart';
 
 class PlayerService extends ChangeNotifier {
-  final AudioPlayer _audioPlayer = AudioPlayer();
+  final LunaAudioHandler _handler;
 
   StreamSubscription<Duration?>? _durationSub;
   StreamSubscription<Duration>? _positionSub;
@@ -38,25 +39,25 @@ class PlayerService extends ChangeNotifier {
   bool get hasTrack => _currentTrack != null;
   List<TrackItem> get recentlyPlayed => List.unmodifiable(_recentlyPlayed);
 
-  PlayerService() {
+  PlayerService(this._handler) {
     _loadRecentlyPlayed();
 
-    _durationSub = _audioPlayer.durationStream.listen((value) {
+    _durationSub = _handler.durationStream.listen((value) {
       _duration = value ?? Duration.zero;
       notifyListeners();
     });
 
-    _positionSub = _audioPlayer.positionStream.listen((value) {
+    _positionSub = _handler.positionStream.listen((value) {
       _position = value;
       notifyListeners();
     });
 
-    _playerStateSub = _audioPlayer.playerStateStream.listen((state) {
+    _playerStateSub = _handler.playerStateStream.listen((state) {
       _isPlaying = state.playing;
       notifyListeners();
     });
 
-    _processingSub = _audioPlayer.processingStateStream.listen((state) {
+    _processingSub = _handler.processingStateStream.listen((state) {
       if (state == ProcessingState.completed && !_isManuallyStopping) {
         onSongComplete?.call();
       }
@@ -123,7 +124,7 @@ class PlayerService extends ChangeNotifier {
   }) async {
     try {
       _isManuallyStopping = true;
-      await _audioPlayer.stop();
+      await _handler.stop();
       _isManuallyStopping = false;
 
       _isSettingUrl = true;
@@ -140,29 +141,24 @@ class PlayerService extends ChangeNotifier {
 
       notifyListeners();
 
-      await _audioPlayer.setAudioSource(
-        AudioSource.uri(
-          Uri.parse(url),
-          headers: {
-            'User-Agent':
-                'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 '
-                '(KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
-            'Referer': 'https://www.youtube.com/',
-          },
-          tag: track != null
-              ? MediaItem(
-                  id: track.videoId,
-                  title: track.title,
-                  artist: track.artist,
-                  artUri: track.thumbnail.isNotEmpty
-                      ? Uri.parse(track.thumbnail)
-                      : null,
-                )
-              : null,
-        ),
-      );
+      final mediaItem = track != null
+          ? MediaItem(
+              id: track.videoId,
+              title: track.title,
+              artist: track.artist,
+              artUri: track.thumbnail.isNotEmpty
+                  ? Uri.parse(track.thumbnail)
+                  : null,
+              displayTitle: track.title,
+              displaySubtitle: track.artist,
+            )
+          : MediaItem(
+              id: url,
+              title: 'Unknown',
+              artist: 'Unknown',
+            );
 
-      if (autoPlay) await _audioPlayer.play();
+      await _handler.playFromUrl(url, mediaItem: mediaItem);
     } catch (e, st) {
       _errorMessage = 'Failed to load audio: $e';
       debugPrint(_errorMessage);
@@ -177,10 +173,10 @@ class PlayerService extends ChangeNotifier {
 
   Future<void> togglePlayPause() async {
     try {
-      if (_audioPlayer.playing) {
-        await _audioPlayer.pause();
+      if (_handler.playing) {
+        await _handler.pause();
       } else {
-        await _audioPlayer.play();
+        await _handler.play();
       }
     } catch (e) {
       _errorMessage = 'Toggle failed: $e';
@@ -191,7 +187,7 @@ class PlayerService extends ChangeNotifier {
 
   Future<void> seek(Duration position) async {
     try {
-      await _audioPlayer.seek(position);
+      await _handler.seek(position);
     } catch (e) {
       _errorMessage = 'Seek failed: $e';
       debugPrint(_errorMessage);
@@ -202,7 +198,7 @@ class PlayerService extends ChangeNotifier {
   Future<void> stop() async {
     try {
       _isManuallyStopping = true;
-      await _audioPlayer.stop();
+      await _handler.stop();
       _isManuallyStopping = false;
       notifyListeners();
     } catch (e) {
@@ -218,7 +214,6 @@ class PlayerService extends ChangeNotifier {
     _positionSub?.cancel();
     _playerStateSub?.cancel();
     _processingSub?.cancel();
-    _audioPlayer.dispose();
     super.dispose();
   }
 }

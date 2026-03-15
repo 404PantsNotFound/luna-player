@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -9,7 +11,6 @@ import '../../../core/services/stream_resolver.dart';
 import '../../../core/services/youtube_data_api.dart';
 import '../../player/application/player_service.dart';
 import '../../player/presentation/youtube_player_page.dart';
-
 import '../../playlists/presentation/add_to_playlist_sheet.dart';
 
 class SearchPage extends StatefulWidget {
@@ -26,6 +27,7 @@ class _SearchPageState extends State<SearchPage> {
   bool _isLoading = false;
   bool _showHistory = false;
   List<TrackItem> _results = [];
+  Timer? _debounce;
 
   @override
   void initState() {
@@ -33,29 +35,51 @@ class _SearchPageState extends State<SearchPage> {
     _focusNode.addListener(() {
       setState(() => _showHistory = _focusNode.hasFocus);
     });
-    _controller.addListener(() {
-      setState(() {}); // rebuild for suffix icon + history filter
+    _controller.addListener(_onTextChanged);
+  }
+
+  void _onTextChanged() {
+    setState(() {}); // rebuild for suffix icon + history filter
+
+    final query = _controller.text.trim();
+
+    // Cancel previous timer
+    _debounce?.cancel();
+
+    if (query.isEmpty) {
+      setState(() {
+        _results = [];
+        _isLoading = false;
+      });
+      return;
+    }
+
+    // ✅ Small 400ms debounce to avoid hammering on every keystroke
+    _debounce = Timer(const Duration(milliseconds: 400), () {
+      _search(query, addToHistory: false);
     });
   }
 
   @override
   void dispose() {
+    _debounce?.cancel();
+    _controller.removeListener(_onTextChanged);
     _controller.dispose();
     _focusNode.dispose();
     super.dispose();
   }
 
-  Future<void> _search(String query) async {
+  Future<void> _search(String query, {bool addToHistory = true}) async {
     final trimmed = query.trim();
     if (trimmed.isEmpty) return;
 
-    _focusNode.unfocus();
-    setState(() {
-      _isLoading = true;
-      _showHistory = false;
-    });
+    if (addToHistory) {
+      _focusNode.unfocus();
+      setState(() => _showHistory = false);
+      context.read<SearchHistoryService>().addSearch(trimmed);
+    }
 
-    context.read<SearchHistoryService>().addSearch(trimmed);
+    setState(() => _isLoading = true);
 
     try {
       final api = context.read<YoutubeDataApi>();
@@ -77,6 +101,9 @@ class _SearchPageState extends State<SearchPage> {
     final resolver = context.read<StreamResolver>();
     final player = context.read<PlayerService>();
     final queue = context.read<QueueService>();
+
+    // Save to history when user actually plays a song
+    context.read<SearchHistoryService>().addSearch(_controller.text.trim());
 
     queue.setQueue(_results, index);
 
@@ -107,14 +134,13 @@ class _SearchPageState extends State<SearchPage> {
       appBar: AppBar(title: const Text('Search')),
       body: Column(
         children: [
-          // Search bar
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
             child: TextField(
               controller: _controller,
               focusNode: _focusNode,
               textInputAction: TextInputAction.search,
-              onSubmitted: _search,
+              onSubmitted: (q) => _search(q, addToHistory: true),
               decoration: InputDecoration(
                 hintText: 'Search songs, artists...',
                 border: const OutlineInputBorder(),
@@ -133,10 +159,11 @@ class _SearchPageState extends State<SearchPage> {
             ),
           ),
 
-          // ✅ History dropdown — shown when focused
+          // History dropdown
           Consumer<SearchHistoryService>(
             builder: (context, historyService, _) {
-              final suggestions = historyService.suggestions(_controller.text);
+              final suggestions =
+                  historyService.suggestions(_controller.text);
 
               if (!_showHistory || suggestions.isEmpty) {
                 return const SizedBox.shrink();
@@ -152,21 +179,15 @@ class _SearchPageState extends State<SearchPage> {
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    // Header row
                     Padding(
-                      padding:
-                          const EdgeInsets.fromLTRB(16, 10, 8, 4),
+                      padding: const EdgeInsets.fromLTRB(16, 10, 8, 4),
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          Text(
-                            'Recent searches',
-                            style: TextStyle(
-                              color: Colors.grey.shade500,
-                              fontSize: 12,
-                              letterSpacing: 0.5,
-                            ),
-                          ),
+                          Text('Recent searches',
+                              style: TextStyle(
+                                  color: Colors.grey.shade500,
+                                  fontSize: 12)),
                           TextButton(
                             onPressed: historyService.clearAll,
                             style: TextButton.styleFrom(
@@ -175,43 +196,31 @@ class _SearchPageState extends State<SearchPage> {
                               tapTargetSize:
                                   MaterialTapTargetSize.shrinkWrap,
                             ),
-                            child: Text(
-                              'Clear all',
-                              style: TextStyle(
-                                color: Colors.grey.shade400,
-                                fontSize: 12,
-                              ),
-                            ),
+                            child: Text('Clear all',
+                                style: TextStyle(
+                                    color: Colors.grey.shade400,
+                                    fontSize: 12)),
                           ),
                         ],
                       ),
                     ),
                     const Divider(height: 1),
-                    // History items
                     ...suggestions.map(
                       (query) => ListTile(
                         dense: true,
-                        leading: Icon(
-                          Icons.history,
-                          color: Colors.grey.shade600,
-                          size: 18,
-                        ),
-                        title: Text(
-                          query,
-                          style: const TextStyle(fontSize: 14),
-                        ),
+                        leading: Icon(Icons.history,
+                            color: Colors.grey.shade600, size: 18),
+                        title: Text(query,
+                            style: const TextStyle(fontSize: 14)),
                         trailing: IconButton(
-                          icon: Icon(
-                            Icons.close,
-                            color: Colors.grey.shade600,
-                            size: 16,
-                          ),
+                          icon: Icon(Icons.close,
+                              color: Colors.grey.shade600, size: 16),
                           onPressed: () =>
                               historyService.removeSearch(query),
                         ),
                         onTap: () {
                           _controller.text = query;
-                          _search(query);
+                          _search(query, addToHistory: true);
                         },
                       ),
                     ),
@@ -223,15 +232,17 @@ class _SearchPageState extends State<SearchPage> {
 
           const SizedBox(height: 8),
 
-          // Results
           Expanded(
             child: _isLoading
                 ? const Center(child: CircularProgressIndicator())
                 : _results.isEmpty
                     ? Center(
                         child: Text(
-                          'Search for a song to start playing',
-                          style: TextStyle(color: Colors.grey.shade500),
+                          _controller.text.isEmpty
+                              ? 'Search for a song to start playing'
+                              : 'No results found',
+                          style:
+                              TextStyle(color: Colors.grey.shade500),
                         ),
                       )
                     : Consumer<LikesService>(
@@ -242,19 +253,22 @@ class _SearchPageState extends State<SearchPage> {
                                 const Divider(height: 1),
                             itemBuilder: (context, index) {
                               final track = _results[index];
-                              final liked = likes.isLiked(track.videoId);
+                              final liked =
+                                  likes.isLiked(track.videoId);
 
                               return ListTile(
                                 leading: ClipRRect(
-                                  borderRadius: BorderRadius.circular(8),
+                                  borderRadius:
+                                      BorderRadius.circular(8),
                                   child: track.thumbnail.isNotEmpty
                                       ? Image.network(
                                           track.thumbnail,
                                           width: 56,
                                           height: 56,
                                           fit: BoxFit.cover,
-                                          errorBuilder: (_, __, ___) =>
-                                              _placeholder(),
+                                          errorBuilder:
+                                              (_, __, ___) =>
+                                                  _placeholder(),
                                         )
                                       : _placeholder(),
                                 ),
@@ -272,22 +286,26 @@ class _SearchPageState extends State<SearchPage> {
                                   mainAxisSize: MainAxisSize.min,
                                   children: [
                                     IconButton(
-                                    onPressed: () => likes.toggleLike(track),
-                                    icon: Icon(
-                                      liked ? Icons.favorite : Icons.favorite_border,
-                                      color: liked
-                                      ? const Color(0xFF1DB954)
-                                      : Colors.grey.shade600,
-                                  ),
+                                      onPressed: () =>
+                                          likes.toggleLike(track),
+                                      icon: Icon(
+                                        liked
+                                            ? Icons.favorite
+                                            : Icons.favorite_border,
+                                        color: liked
+                                            ? const Color(0xFF1DB954)
+                                            : Colors.grey.shade600,
+                                      ),
+                                    ),
+                                    IconButton(
+                                      onPressed: () =>
+                                          AddToPlaylistSheet.show(
+                                              context, track),
+                                      icon: Icon(Icons.playlist_add,
+                                          color: Colors.grey.shade600),
+                                    ),
+                                  ],
                                 ),
-                                IconButton(
-                                  onPressed: () =>
-                                    AddToPlaylistSheet.show(context, track),
-                                  icon: Icon(Icons.playlist_add,
-                                    color: Colors.grey.shade600),
-                                ),
-                              ],
-                            ),
                                 onTap: () => _openTrack(track, index),
                               );
                             },

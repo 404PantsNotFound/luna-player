@@ -39,7 +39,8 @@ class YoutubeDataApi {
           if (title == null || title.isEmpty) continue;
 
           // Skip long videos
-          if (duration != null && duration.inMinutes > 15) continue;
+          // Skip very long videos (mixes/albums) — increase to 20 mins
+          if (duration != null && duration.inMinutes > 20) continue;
 
           final thumbnail =
               'https://i.ytimg.com/vi/$videoId/hqdefault.jpg';

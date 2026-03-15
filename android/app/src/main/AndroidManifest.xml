@@ -9,7 +9,9 @@
         android:label="Luna"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher"
-        android:usesCleartextTraffic="true">
+        android:usesCleartextTraffic="true"
+        android:allowTaskReparenting="true"
+        android:alwaysRetainTaskState="true">
 
         <activity
             android:name="com.ryanheise.audioservice.AudioServiceActivity"
@@ -28,9 +30,11 @@
             </intent-filter>
         </activity>
 
+        <!-- ✅ Point to our custom service -->
         <service
             android:name="com.ryanheise.audioservice.AudioService"
             android:exported="true"
+            android:stopWithTask="false"
             android:foregroundServiceType="mediaPlayback">
             <intent-filter>
                 <action android:name="android.media.browse.MediaBrowserService"/>

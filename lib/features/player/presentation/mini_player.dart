@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:marquee/marquee.dart';
 import 'package:provider/provider.dart';
 
 import '../application/player_service.dart';
@@ -17,13 +18,12 @@ class MiniPlayer extends StatelessWidget {
 
         return GestureDetector(
           onTap: () {
-            // ✅ Remove any existing player pages before pushing new one
             Navigator.pushAndRemoveUntil(
               context,
               MaterialPageRoute(
                 builder: (_) => YoutubePlayerPage(track: track),
               ),
-              (route) => route.isFirst, // keep only the shell
+              (route) => route.isFirst,
             );
           },
           child: Container(
@@ -42,6 +42,7 @@ class MiniPlayer extends StatelessWidget {
             ),
             child: Row(
               children: [
+                // Thumbnail
                 Padding(
                   padding: const EdgeInsets.all(6),
                   child: ClipOval(
@@ -57,20 +58,47 @@ class MiniPlayer extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(width: 8),
+
+                // Title + artist
                 Expanded(
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        track.title,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 13,
-                        ),
+                      // ✅ Marquee for long titles
+                      SizedBox(
+                        height: 20,
+                        child: track.title.length > 20
+                            ? Marquee(
+                                text: track.title,
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 13,
+                                ),
+                                scrollAxis: Axis.horizontal,
+                                blankSpace: 30,
+                                velocity: 30,
+                                pauseAfterRound:
+                                    const Duration(seconds: 2),
+                                startAfter: const Duration(seconds: 1),
+                                accelerationDuration:
+                                    const Duration(seconds: 1),
+                                accelerationCurve: Curves.linear,
+                                decelerationDuration:
+                                    const Duration(milliseconds: 500),
+                                decelerationCurve: Curves.easeOut,
+                              )
+                            : Text(
+                                track.title,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 13,
+                                ),
+                              ),
                       ),
                       const SizedBox(height: 2),
                       Text(
@@ -85,6 +113,8 @@ class MiniPlayer extends StatelessWidget {
                     ],
                   ),
                 ),
+
+                // Play/Pause
                 Padding(
                   padding: const EdgeInsets.only(right: 8),
                   child: IconButton(

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:marquee/marquee.dart';
 import 'package:provider/provider.dart';
 
 import '../../../core/models/track_item.dart';
@@ -163,13 +164,6 @@ class _YoutubePlayerPageState extends State<YoutubePlayerPage> {
               MaterialPageRoute(builder: (_) => const QueuePage()),
             ),
           ),
-          IconButton(
-            icon: const Icon(Icons.settings_outlined),
-            onPressed: () => Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => const SettingsPage()),
-            ),
-          ),
         ],
       ),
       body: SafeArea(
@@ -182,7 +176,8 @@ class _YoutubePlayerPageState extends State<YoutubePlayerPage> {
             final liked = likes.isLiked(track.videoId);
             final downloaded = downloader.isDownloaded(track.videoId);
             final isDownloading =
-                downloader.statusOf(track.videoId) == DownloadStatus.downloading;
+                downloader.statusOf(track.videoId) ==
+                    DownloadStatus.downloading;
 
             return Padding(
               padding: const EdgeInsets.symmetric(horizontal: 28),
@@ -211,7 +206,16 @@ class _YoutubePlayerPageState extends State<YoutubePlayerPage> {
                               width: double.infinity,
                               height: 280,
                               fit: BoxFit.cover,
-                              errorBuilder: (_, __, ___) => _artPlaceholder(),
+                              // ✅ Fallback to hqdefault if maxres not available
+                              errorBuilder: (_, __, ___) => Image.network(
+                                track.thumbnail.replaceAll(
+                                    'maxresdefault', 'hqdefault'),
+                                width: double.infinity,
+                                height: 280,
+                                fit: BoxFit.cover,
+                                errorBuilder: (_, __, ___) =>
+                                    _artPlaceholder(),
+                              ),
                             )
                           : _artPlaceholder(),
                     ),
@@ -226,15 +230,38 @@ class _YoutubePlayerPageState extends State<YoutubePlayerPage> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text(
-                              track.title,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 18,
-                                fontWeight: FontWeight.bold,
-                              ),
+                            // ✅ Marquee for long titles
+                            SizedBox(
+                              height: 26,
+                              child: track.title.length > 25
+                                  ? Marquee(
+                                      text: track.title,
+                                      key: ValueKey(track.videoId),
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 18,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                      scrollAxis: Axis.horizontal,
+                                      blankSpace: 40,
+                                      velocity: 40,
+                                      pauseAfterRound:
+                                          const Duration(seconds: 2),
+                                      accelerationDuration:
+                                          const Duration(seconds: 1),
+                                      accelerationCurve: Curves.linear,
+                                      decelerationDuration:
+                                          const Duration(milliseconds: 500),
+                                      decelerationCurve: Curves.easeOut,
+                                    )
+                                  : Text(
+                                      track.title,
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 18,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
                             ),
                             const SizedBox(height: 4),
                             Text(
@@ -323,8 +350,8 @@ class _YoutubePlayerPageState extends State<YoutubePlayerPage> {
                     child: Slider(
                       value: posMs.toDouble(),
                       max: maxMs.toDouble(),
-                      onChanged: (value) =>
-                          player.seek(Duration(milliseconds: value.toInt())),
+                      onChanged: (value) => player
+                          .seek(Duration(milliseconds: value.toInt())),
                     ),
                   ),
 
@@ -398,9 +425,10 @@ class _YoutubePlayerPageState extends State<YoutubePlayerPage> {
                             onPressed: queue.toggleRepeatOne,
                             icon: Icon(
                               Icons.repeat_one,
-                              color: queue.repeatMode == QueueRepeatMode.one
-                                  ? const Color(0xFF1DB954)
-                                  : Colors.grey.shade600,
+                              color:
+                                  queue.repeatMode == QueueRepeatMode.one
+                                      ? const Color(0xFF1DB954)
+                                      : Colors.grey.shade600,
                             ),
                           ),
                         ],
